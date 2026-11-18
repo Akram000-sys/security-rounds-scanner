@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ماسح نقاط التفتيش</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+  <h2>نظام مسح نقاط التفتيش الأمنية</h2>
+  <p>صفحة اختبار الكاميرا</p>
+  <div id="reader" style="width:100%; max-width:400px;"></div>
+  <p id="message">اضغط الزر لتشغيل الكاميرا</p>
+  <button onclick="startScanner()">بدء المسح</button>
+  <button onclick="stopScanner()">إيقاف الكاميرا</button>
+
+  <script>
+    let scanner;
+
+    function startScanner() {
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          document.getElementById("message").innerText =
+            "تمت قراءة الرمز: " + decodedText;
+          stopScanner();
+        },
+        () => {}
+      ).catch(error => {
+        document.getElementById("message").innerText =
+          "تعذر تشغيل الكاميرا: " + error;
+      });
+    }
+
+    function stopScanner() {
+      if (scanner && scanner.isScanning) {
+        scanner.stop();
+      }
+    }
+  </script>
+</body>
+</html>
