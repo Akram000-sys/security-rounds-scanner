@@ -1,45 +1,154 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ماسح نقاط التفتيش</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظام الجولات الأمنية</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+body{font-family:Arial;background:#f2f4f7;margin:0;padding:18px;text-align:center}
+.card{background:white;padding:18px;border-radius:14px;max-width:450px;margin:20px auto;box-shadow:0 2px 8px #0002}
+input,button{width:100%;padding:14px;margin:8px 0;border-radius:8px;font-size:17px;box-sizing:border-box}
+input{border:1px solid #bbb}
+button{background:#1769aa;color:white;border:0}
+button:disabled{background:#999}
+#reader{width:100%;margin:auto}
+#message{overflow-wrap:anywhere}
+</style>
 </head>
 <body>
-  <h2>نظام مسح نقاط التفتيش الأمنية</h2>
-  <p>صفحة اختبار الكاميرا</p>
-  <div id="reader" style="width:100%; max-width:400px;"></div>
-  <p id="message">اضغط الزر لتشغيل الكاميرا</p>
-  <button onclick="startScanner()">بدء المسح</button>
-  <button onclick="stopScanner()">إيقاف الكاميرا</button>
+<h2>نظام مراقبة الجولات الأمنية</h2>
+<button onclick="testGoogleConnection()">اختبار الاتصال مع Google</button>
+<div class="card">
+  <h3>تسجيل دخول الحارس</h3>
+  <input id="pin" type="password" inputmode="numeric" placeholder="أدخل PIN الحارس">
+  <button id="loginButton" onclick="login()">دخول</button>
+  <p id="loginMessage"></p>
+</div>
 
-  <script>
-    let scanner;
+<div class="card" id="scannerCard" style="display:none">
+  <h3 id="guardName">الحارس</h3>
+  <p>امسح رمز QR الموجود عند نقطة التفتيش</p>
+  <div id="reader"></div>
+  <p id="message">اضغط بدء المسح لتشغيل الكاميرا</p>
+  <button id="startButton" onclick="startScanner()">بدء المسح</button>
+  <button onclick="logout()">تسجيل خروج</button>
+</div>
 
-    function startScanner() {
-      scanner = new Html5Qrcode("reader");
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwouZeB9PeP2O-i7z-Ai7NYUgxbB-vPa1pZkrYpOURTFS4Eec1egNlDi2pp8N9GdWPF4A/exec";
+async function testGoogleConnection() {
+  const message = document.getElementById("message");
+  message.textContent = "جاري اختبار الاتصال...";
 
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          document.getElementById("message").innerText =
-            "تمت قراءة الرمز: " + decodedText;
-          stopScanner();
-        },
-        () => {}
-      ).catch(error => {
-        document.getElementById("message").innerText =
-          "تعذر تشغيل الكاميرا: " + error;
-      });
-    }
+  try {
+    const response = await fetch(SCRIPT_URL + "?test=1");
+    const result = await response.text();
 
-    function stopScanner() {
-      if (scanner && scanner.isScanning) {
-        scanner.stop();
-      }
-    }
-  </script>
+    message.textContent = result === "CONNECTED"
+      ? "الاتصال مع Google ناجح"
+      : "وصل رد غير متوقع: " + result;
+  } catch (error) {
+    message.textContent = "فشل الاتصال: " + error.message;
+  }
+}
+let currentPin = "";
+let scanner = null;
+let busy = false;
+
+function login(){
+  const pin = document.getElementById("pin").value.trim();
+  const msg = document.getElementById("loginMessage");
+
+  if(!pin){
+    msg.textContent = "أدخل رقم PIN";
+    return;
+  }
+
+  currentPin = pin;
+
+  document.getElementById("guardName").textContent =
+    "تم إدخال PIN، يمكنك بدء المسح";
+
+  document.getElementById("scannerCard").style.display = "block";
+  msg.textContent = "";
+}
+
+async function startScanner(){
+  if(!currentPin || busy) return;
+
+  scanner = new Html5Qrcode("reader");
+  document.getElementById("message").textContent = "وجّه الكاميرا نحو رمز QR";
+
+  try {
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 240, height: 240 } },
+      onScan,
+      () => {}
+    );
+  } catch(error) {
+    document.getElementById("message").textContent =
+      "تعذر تشغيل الكاميرا: " + error;
+  }
+}
+
+async function onScan(qrCode){
+  if(busy) return;
+  busy = true;
+
+  document.getElementById("message").textContent = "تمت قراءة الرمز، جاري التسجيل...";
+
+  let latitude = "";
+  let longitude = "";
+  let accuracy = "";
+
+  try {
+    const position = await new Promise((resolve,reject) =>
+      navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:8000})
+    );
+    latitude = position.coords.latitude;
+    longitude = position.coords.longitude;
+    accuracy = position.coords.accuracy;
+  } catch(e) {}
+
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: new URLSearchParams({
+        pin: currentPin,
+        qrCode: qrCode,
+        latitude: latitude,
+        longitude: longitude,
+        accuracy: accuracy
+      })
+    });
+
+    const result = await response.json();
+
+    document.getElementById("message").textContent =
+      result.ok
+        ? "تم تسجيل المسح بنجاح: " + result.point
+        : (result.message || "لم يتم تسجيل المسح");
+
+  } catch(e) {
+    document.getElementById("message").textContent =
+      "تعذر الاتصال بالخادم. لم نتأكد من تسجيل المسح.";
+  }
+
+  busy = false;
+}
+
+async function logout(){
+  if(scanner && scanner.isScanning){
+    await scanner.stop();
+  }
+  currentPin = "";
+  scanner = null;
+  document.getElementById("scannerCard").style.display = "none";
+  document.getElementById("pin").value = "";
+  document.getElementById("loginMessage").textContent = "";
+}
+</script>
 </body>
 </html>
