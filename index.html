@@ -19,6 +19,7 @@ button:disabled{background:#999}
 <body>
 <h2>نظام مراقبة الجولات الأمنية</h2>
 <button onclick="testGoogleConnection()">اختبار الاتصال مع Google</button>
+  <p id="testMessage"></p>
 <div class="card">
   <h3>تسجيل دخول الحارس</h3>
   <input id="pin" type="password" inputmode="numeric" placeholder="أدخل PIN الحارس">
@@ -38,7 +39,7 @@ button:disabled{background:#999}
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwouZeB9PeP2O-i7z-Ai7NYUgxbB-vPa1pZkrYpOURTFS4Eec1egNlDi2pp8N9GdWPF4A/exec";
 async function testGoogleConnection() {
-  const message = document.getElementById("message");
+  const message = document.getElementById("testMessage");
   message.textContent = "جاري اختبار الاتصال...";
 
   try {
